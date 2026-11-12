@@ -1,0 +1,53 @@
+# 2. Secured and monitored web infrastructure
+
+## Diagram
+
+```
+                    User (browser)
+                          |
+            https://www.foobar.com  (SSL certificate)
+                          |
+                  [ Firewall 1 ]
+                          |
+              +-----------v-----------+
+              | Load balancer (HAProxy)|
+              | SSL termination        |
+              | + monitoring client    |
+              +-----+-----------+------+
+                    |           |
+             [ Firewall 2 ] [ Firewall 3 ]
+                    |           |
+         +----------v--+     +--v----------+
+         |  Server 1   |     |  Server 2   |
+         | Nginx       |     | Nginx       |
+         | App server  |     | App server  |
+         | Code base   |     | Code base   |
+         | MySQL       |     | MySQL       |
+         | (Primary)   |---->| (Replica)   |
+         | + monitoring|     | + monitoring|
+         |   client    |     |   client    |
+         +-------------+     +-------------+
+                    \           /
+                     v         v
+              Monitoring service (e.g. Sumo Logic)
+```
+
+## Why each new element is added
+
+- **3 firewalls:** one in front of the load balancer and one in front of each server, so only the needed ports (e.g. 80/443 on the load balancer, internal ports between machines) are reachable.
+- **1 SSL certificate for www.foobar.com:** lets the site be served over HTTPS so traffic is encrypted.
+- **3 monitoring clients:** one data collector on each machine (load balancer + 2 servers) that sends metrics and logs to the monitoring service (Sumo Logic or similar).
+
+## Specifics
+
+- **What firewalls are for:** they filter network traffic with rules (allowed IPs, ports, protocols) and block everything else, protecting servers from unwanted or malicious access.
+- **Why traffic is served over HTTPS:** HTTPS encrypts data between the browser and the site (TLS), so passwords and personal data cannot be read or changed in transit, and the certificate proves the site's identity.
+- **What monitoring is used for:** to watch the health and performance of the infrastructure (CPU, memory, disk, response time, error rate, uptime) and to alert the team when something goes wrong.
+- **How the monitoring tool collects data:** an agent (data collector) installed on each machine reads metrics and log files (e.g. Nginx access/error logs, system stats) and sends them to the monitoring service, where they are stored, graphed and used for alerts.
+- **Monitoring web server QPS:** QPS = queries (requests) per second. Configure the monitoring client to collect the Nginx access log (or the Nginx `stub_status` metrics), count requests per second, build a dashboard for it and set an alert threshold when QPS gets too high.
+
+## Issues with this infrastructure
+
+- **Terminating SSL at the load balancer:** traffic is decrypted at the load balancer and travels unencrypted between the load balancer and the servers, so anyone inside that network could read it.
+- **Only one MySQL server accepting writes:** the Primary is a single point of failure for writes; if it goes down the application cannot save data. It can also become a bottleneck under heavy write load.
+- **Servers with all the same components:** each server runs the web server, application server and database together, so they compete for the same CPU/RAM, cannot be scaled separately, and one failing component (e.g. a database crash) can take the whole server down.

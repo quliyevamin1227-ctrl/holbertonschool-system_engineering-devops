@@ -1,0 +1,57 @@
+# 0. Simple web stack
+
+## Diagram
+
+```
+  User (browser)
+      |
+      | 1. types www.foobar.com
+      v
+  DNS resolver  --->  www.foobar.com  (A record)  --->  8.8.8.8
+      |
+      | 2. HTTP/HTTPS request over TCP/IP to 8.8.8.8
+      v
++--------------------------------------------------+
+|              Server  (IP 8.8.8.8)                |
+|                                                  |
+|   +-------------------+                          |
+|   | Web server        |  serves static files,    |
+|   | (Nginx)           |  forwards dynamic reqs   |
+|   +---------+---------+                          |
+|             |                                    |
+|   +---------v---------+      +---------------+   |
+|   | Application server|----->| Application   |   |
+|   | (e.g. Gunicorn/   |      | files         |   |
+|   |  PHP-FPM)         |      | (code base)   |   |
+|   +---------+---------+      +---------------+   |
+|             |                                    |
+|   +---------v---------+                          |
+|   | Database (MySQL)  |                          |
+|   +-------------------+                          |
++--------------------------------------------------+
+```
+
+## How a request flows
+
+1. A user wants to visit `www.foobar.com` and types it in the browser.
+2. The browser asks DNS for the IP of `www.foobar.com`. The `www` record points to `8.8.8.8`.
+3. The browser opens a TCP/IP connection to `8.8.8.8` and sends an HTTP(S) request.
+4. Nginx (web server) receives the request. Static files are returned directly; dynamic requests are passed to the application server.
+5. The application server runs the code base, which reads/writes data in MySQL.
+6. The response goes back through Nginx to the user's browser.
+
+## Specifics
+
+- **What is a server:** a physical or virtual computer (hardware or software) that provides a service to other programs or devices, called clients.
+- **Role of the domain name:** a human-friendly name (`foobar.com`) that maps to the server's IP address through DNS, so users do not need to remember IPs.
+- **Type of DNS record for `www`:** an `A` record (`www.foobar.com` -> `8.8.8.8`). It could also be a `CNAME` pointing to `foobar.com`.
+- **Role of the web server:** accepts HTTP/HTTPS requests, serves static content (HTML, CSS, images) and forwards dynamic requests to the application server, then returns responses.
+- **Role of the application server:** runs the application code (business logic), builds dynamic pages/data and talks to the database.
+- **Role of the database:** stores and organizes the website's data so it can be read, updated and managed efficiently.
+- **How the server talks to the user's computer:** over the Internet using the TCP/IP protocol suite, with HTTP or HTTPS on top.
+
+## Issues with this infrastructure
+
+- **SPOF (Single Point Of Failure):** there is only one server. If it (or Nginx, or MySQL) goes down, the whole website is down.
+- **Downtime during maintenance:** deploying new code or restarting the web server makes the site unavailable for that time.
+- **Cannot scale:** one server has limited CPU/RAM/disk; if traffic grows too much it cannot handle the load, and there is no way to add capacity without changing the design.

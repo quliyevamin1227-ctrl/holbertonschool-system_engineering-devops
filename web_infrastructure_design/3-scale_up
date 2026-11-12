@@ -1,0 +1,44 @@
+# 3. Scale up
+
+## Diagram
+
+```
+                       User (browser)
+                             |
+                https://www.foobar.com (DNS)
+                             |
+          +------------------+------------------+
+          |                                     |
++---------v----------+             +------------v-------+
+| Load balancer 1    |<----------->| Load balancer 2    |
+| (HAProxy)          |  cluster    | (HAProxy)          |
+| active             | (heartbeat) | active / backup    |
++---------+----------+             +------------+-------+
+          |                                     |
+          +------------------+------------------+
+                             |
+                   +---------v---------+
+                   |  Web server       |
+                   |  (Nginx)          |
+                   +---------+---------+
+                             |
+                   +---------v---------+
+                   | Application server|
+                   | + code base       |
+                   +---------+---------+
+                             |
+                   +---------v---------+
+                   | Database server   |
+                   | (MySQL)           |
+                   +-------------------+
+```
+
+## Why each new element is added
+
+- **1 additional server:** gives us enough machines to put each component on its own server (web server, application server, database).
+- **Second load balancer (HAProxy) configured as a cluster with the first one:** removes the load balancer as a single point of failure. The two load balancers check each other (heartbeat); if one fails, the other keeps receiving traffic (for example using a shared virtual IP).
+- **Web server on its own server (Nginx):** handles HTTP/HTTPS, serves static files and forwards dynamic requests. It can be scaled and tuned on its own.
+- **Application server on its own server:** runs the code base and business logic. Separating it means heavy application work does not slow down the web server or the database, and more application servers can be added when needed.
+- **Database on its own server (MySQL):** gets its own CPU, RAM and disk, which improves performance and lets the database be scaled (more RAM, replicas) independently.
+
+Splitting the components removes resource competition between them, makes each layer easier to scale and maintain, and limits the impact when one component fails.
